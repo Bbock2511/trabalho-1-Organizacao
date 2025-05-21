@@ -11,13 +11,16 @@ mem_stack:.space 1024 #Memória para a pilha $sp
 #############################################
 
 .text
-main:
+inicializa:
 	la $s0, reg
 	la $s1, mem_stack
 	
 	jal inicializaReg
 	
+main:
+	jal busca
 	
+	j main
 	j finaliza
 
 #-------------Procedimento de Inicialização dos registradores-----------------------
@@ -56,8 +59,21 @@ move $a1, $s1 #$a1 = $s1
 	
 	jr $ra
 #------------------------Fim do Procedimento-----------------------------
+	
+#--------------------Procedimento de Busca de Instrução-----------------
+#Registradores
+#$t0 ->
+busca:
+#---Prólogo---
+	addi $sp, $sp, -4
+	
+#------------------Procedimento de Decodificação-----------------------
+decode:
 
-
+#-----------------Procedimento de Execução---------------------------
+executa:
+	
+	
 #####################################################
 ################Tipos de Instrucao######################
 instrucaoR:
