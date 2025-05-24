@@ -1,4 +1,5 @@
 .data
+ErroInstrucaoR: .asciiz "Falha em ler funct tipo R"
 #Variaveis de leitura de instrução
 PC: .word 0x00400000 #variável que capturará as instruções lidas
 IR: .word 0 #endereço será sobrescrito pela instrução capturada por PC
@@ -142,7 +143,7 @@ move $t0, $a0
 	#decodifica tipo R
 	opcodeR:
 		#R_decode(conteúdo_IR)
-		move $a0, $t0
+		move $a0, $t0 
 		j R_decode
 		
 	#decodifica tipo J
@@ -161,7 +162,8 @@ jr $ra
 #-------------
 
 #------------Procedimendo de Decodificação tipo R-----------------
-#
+#Registradores:
+#$s0 -> Instrução a ser decodificada
 R_decode:
 		#sll = 0x00
 		#srl = 0x02
@@ -173,21 +175,207 @@ R_decode:
 #---Prólogo---
 addi $sp, $sp, -4
 sw $ra, 0($sp)
+
+move $s0, $a0
 #-------------
+	andi $t0, $s0, 0x3f #usa o número 3f para zerar todos os bits após os 6 primeiros
+	#Verifica qual a instrução correspondente ao funct
+	beq $t0, $zero, sll
+	beq $t0, 0x02, srl
+	beq $t0, 0x20, add
+	beq $t0, 0x22, sub
+	beq $t0, 0x24, and
+	beq $t0, 0x25, or
 	
+	li $v0, 4
+	la $a0, ErroInstrucaoR
+	syscall
+	j finaliza
+	
+	sll:
+		#decodifica os dados
+		andi $t0, $s0, 0x7c0 #usa o número 7c0 para zerar todos os bits, exceto os de shamt(bits que serão deslocados)
+		andi $t1, $s0, 0x7c00 #usa o número 7c00 para zerar todos os bits, exceto os de rd(numero do registrador que receberá o resultado)
+		andi $t2, $s0, 0xf8000 #usa o número f8000 para zerar todos os bits, exceto os de rt(numero do registrador que sofrerá a operação)
+		
+		#executa_sll(shamt, rd, rt)
+		move $a0, $t0
+		move $a1, $t1
+		move $a2, $t2
+		jal executa_sll
+		j terminaDecodeR
+		
+	srl:
+		#decodifica os dados
+		andi $t0, $s0, 0x7c0 #usa o número 7c0 para zerar todos os bits, exceto os de shamt(bits que serão deslocados)
+		andi $t1, $s0, 0x7c00 #usa o número 7c00 para zerar todos os bits, exceto os de rd(numero do registrador que receberá o resultado)
+		andi $t2, $s0, 0xf8000 #usa o número f8000 para zerar todos os bits, exceto os de rt(numero do registrador que sofrerá a operação)
+		
+		#executa_sll(shamt, rd, rt)
+		move $a0, $t0
+		move $a1, $t1
+		move $a2, $t2
+		jal executa_srl
+		j terminaDecodeR
+	add:
+		#decodifica os dados
+		andi $t0, $s0, 0x7c00 #usa o número 0x7c00 para zerar todos os bits, exceto os de rd(número do registrador que receberá o resultado
+		andi $t1, $s0, 0xf8000 #usa o número 0xf8000 para zerar todos os bits, exceto os de rt(número de um dos registradores operadores)
+		andi $t2, $s0, 0x01f00000 #usa o número 0x01f00000 para zerar todos os bits, exceto os de rs(número do outro registrador operador)
+		
+		#executa_add(rd, rt, rs)
+		move $a0, $t0
+		move $a1, $t1 
+		move $a2, $t2
+		jal executa_add
+		j terminaDecodeR
+	sub:
+	and:
+	or:
+	
+terminaDecodeR:
 #---Epílogo---
 lw $ra, 0($sp)
 addi $sp, $sp, 4
 jr $ra
 #-------------
-#-----------------------------------------------------------------
-
-#-----------------Procedimento de Execução---------------------------
+#--------------------------------------------------------------------
+#-----------------Procedimento de Execução de add---------------------------
+#Registradores
+#$s0 -> rd (registrador onde o resultado vai ser armazenado)
+#$s1 -> rt (registrador operador 1)
+#$s2 -> rs (registrador operador 2)
+#(todos são indices para o vetor de registradores)
+#
 #Argumentos
-executa:
+#$a0 -> rd
+#$a1 -> rt
+#$a2 -> rs
+executa_add:
+#---Pŕologo---
+addi $sp, $sp, -8
+sw $ra, 0($sp)
+sw $s0, 4($sp)
 
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#-------------
+	la $t0, reg
+
+#---Epílogo---
+lw $ra, 0($sp)
+lw $s0, 4($sp)
+#-------------
+#---------------------------------------------------------------------------
+
+#-----------------Procedimento de Execução de sll---------------------------
+#Registradores
+#$s0 -> shamt
+#$s1 -> rd(indice do registrador destino)
+#$s2 -> rt(indice do registrador operador)
+#
+#Argumentos
+#$a0 -> shamt
+#$a1 -> rd
+#$a2 -> rt
+executa_sll:
+#---Prólogo---
+addi $sp, $sp, -8
+sw $ra, 0($sp)
+sw $s0, 4($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#-------------
+	la $t0, reg #pegando o vetor de registradores
+	
+	#pegar o endereço do registrador de rd
+	sll $t1, $s1, 2 #transforma o indice do registrador em offset para somar no vetor
+	add $t1, $t1, $t0 #$t1 = $t1(offset)+$t0(addr de reg)
+	#$t1 tem o endereço do registrador destino
 	
 	
+	#pegar o endereço do registrador de rt
+	sll $t2, $s2, 2 #transforma o indice do registrador em offset para somar no vetor
+	add $t2, $t2, $t0 #$t2 = $t2(offset)+$t0(addr de reg)
+	#$t2 tem o endereço registrador que vai ter os bits deslocados
+	
+	lw $t2, 0($t2)
+	
+	#a partir daqui, $t0 vira o indice do loop
+	move $t0, $zero
+	loopDeslocamentosll:
+		addi $t0, $t0, 1 #incrementa o indice
+		mul $t2, $t2, 2 #multiplica por 2(cada bit deslocado é uma multiplicação)
+		beq $t0, $s0, fimLoopsll #termina o loop se o indice for igual a shamt
+		j loopDeslocamentosll
+	
+	fimLoopsll:
+		sw $t2, 0($t1) #guarda o valor da operação em rd
+	
+#---Epílogo---
+lw $ra 0($sp)
+lw $s0, 4($sp)
+addi $sp, $sp, 8
+jr $ra
+#-------------
+
+#--------------------------------------------------------------------
+#-----------------Procedimento de Execução de srl---------------------------
+#Registradores
+#$s0 -> shamt
+#$s1 -> rd(indice do registrador destino)
+#$s2 -> rt(indice do registrador operador)
+#
+#Argumentos
+#$a0 -> shamt
+#$a1 -> rd
+#$a2 -> rt
+executa_srl:
+#---Prólogo---
+addi $sp, $sp, -8
+sw $ra, 0($sp)
+sw $s0, 4($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#-------------
+	la $t0, reg #pegando o vetor de registradores
+	
+	#pegar o endereço do registrador de rd
+	sll $t1, $s1, 2 #transforma o indice do registrador em offset para somar no vetor
+	add $t1, $t1, $t0 #$t1 = $t1(offset)+$t0(addr de reg)
+	#$t1 tem o endereço do registrador destino
+	
+	
+	#pegar o endereço do registrador de rt
+	sll $t2, $s2, 2 #transforma o indice do registrador em offset para somar no vetor
+	add $t2, $t2, $t0 #$t2 = $t2(offset)+$t0(addr de reg)
+	#$t2 tem o endereço registrador que vai ter os bits deslocados
+	
+	lw $t2, 0($t2)
+	
+	#a partir daqui, $t0 vira o indice do loop
+	move $t0, $zero
+	loopDeslocamentosrl:
+		addi $t0, $t0, 1 #incrementa o indice
+		div $t2, $t2, 2 #divide por 2(cada bit deslocado é uma divisão)
+		beq $t0, $s0, fimLoopsrl #termina o loop se o indice for igual a shamt
+		j loopDeslocamentosrl
+	
+	fimLoopsrl:
+		sw $t2, 0($t1) #guarda o valor da operação em rd
+	
+#---Epílogo---
+lw $ra 0($sp)
+lw $s0, 4($sp)
+addi $sp, $sp, 8
+jr $ra
+#-------------
+#--------------------------------------------------------------------
 #####################################################
 ################Tipos de Instrucao######################
 
