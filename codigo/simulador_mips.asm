@@ -110,6 +110,7 @@ lw $ra, 0($sp)
 addi $sp, $sp, 4
 jr $ra
 #-------------
+#------------------------Fim do Procedimento-----------------------------
 
 #------------------Procedimento de Decodificação-----------------------
 #Registradores:
@@ -142,16 +143,32 @@ move $t0, $a0
 	
 	#decodifica tipo R
 	opcodeR:
-		#R_decode(conteúdo_IR)
+		#Vai pra decodificação de funct.
+		#R_decode(conteudo_IR)
 		move $a0, $t0 
-		j R_decode
+		jal R_decode
+		j terminaDecodificacao
 		
 	#decodifica tipo J
 	opcodeJ:
+		andi $t0, $t0, 0x03ffffff #usa o número hexadecimal para zerar os bits do opcode e manter o endereço
+		#executa_j(address)
+		move $a0, $t0
+		jal executa_j
+		j terminaDecodificacao
 	
 	#decodifica tipo I
+		#addi
+		#andi
+		#ori
+		#lw
+		#sw
+		#beq
+		#bne
+		#syscall
 	opcodeI:
 		
+terminaDecodificacao:
 #---Epílogo---
 lw $ra, 0($sp)
 lw $s0, 4($sp)
@@ -160,18 +177,12 @@ addi $sp, $sp, 12
 
 jr $ra
 #-------------
+#------------------------Fim do Procedimento-----------------------------
 
 #------------Procedimendo de Decodificação tipo R-----------------
 #Registradores:
 #$s0 -> Instrução a ser decodificada
 R_decode:
-		#sll = 0x00
-		#srl = 0x02
-		#add = 0x20
-		#sub = 0x22
-		#and = 0x24
-		#or = 0x25
-		#shamt é o número de bits deslocados em sll e srl
 #---Prólogo---
 addi $sp, $sp, -4
 sw $ra, 0($sp)
@@ -230,8 +241,42 @@ move $s0, $a0
 		jal executa_add
 		j terminaDecodeR
 	sub:
+		#decodifica os dados
+		andi $t0, $s0, 0x7c00 #usa o número 0x7c00 para zerar todos os bits, exceto os de rd(número do registrador que receberá o resultado
+		andi $t1, $s0, 0xf8000 #usa o número 0xf8000 para zerar todos os bits, exceto os de rt(número de um dos registradores operadores)
+		andi $t2, $s0, 0x01f00000 #usa o número 0x01f00000 para zerar todos os bits, exceto os de rs(número do outro registrador operador)
+		
+		#executa_sub(rd, rt, rs)
+		move $a0, $t0
+		move $a1, $t1 
+		move $a2, $t2
+		jal executa_sub
+		j terminaDecodeR
 	and:
+		#decodifica os dados
+		andi $t0, $s0, 0x7c00 #usa o número 0x7c00 para zerar todos os bits, exceto os de rd(número do registrador que receberá o resultado
+		andi $t1, $s0, 0xf8000 #usa o número 0xf8000 para zerar todos os bits, exceto os de rt(número de um dos registradores operadores)
+		andi $t2, $s0, 0x01f00000 #usa o número 0x01f00000 para zerar todos os bits, exceto os de rs(número do outro registrador operador)
+		
+		#executa_and(rd, rt, rs)
+		move $a0, $t0
+		move $a1, $t1 
+		move $a2, $t2
+		jal executa_and
+		j terminaDecodeR
+		
 	or:
+		#decodifica os dados
+		andi $t0, $s0, 0x7c00 #usa o número 0x7c00 para zerar todos os bits, exceto os de rd(número do registrador que receberá o resultado
+		andi $t1, $s0, 0xf8000 #usa o número 0xf8000 para zerar todos os bits, exceto os de rt(número de um dos registradores operadores)
+		andi $t2, $s0, 0x01f00000 #usa o número 0x01f00000 para zerar todos os bits, exceto os de rs(número do outro registrador operador)
+		
+		#executa_or(rd, rt, rs)
+		move $a0, $t0
+		move $a1, $t1 
+		move $a2, $t2
+		jal executa_or
+		j terminaDecodeR
 	
 terminaDecodeR:
 #---Epílogo---
@@ -239,7 +284,196 @@ lw $ra, 0($sp)
 addi $sp, $sp, 4
 jr $ra
 #-------------
-#--------------------------------------------------------------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de j---------------------------
+#Registradores
+#$s0 -> endereço para ser pulado
+#
+#Argumentos
+#$a0 -> endereço para ser pulado
+executa_j:
+#---Prólogo---
+addi $sp, $sp, -8
+sw $ra, 0($sp)
+sw $s0, 4($sp)
+
+move $s0, $a0
+#-------------
+	#Pega o endereço de PC
+	la $t0, PC
+	addi $s0, $s0, -4 #subtrai 4 do endereço para que o incremento de busca não altere o endereço
+	sw $s0, 0($t0)
+#---Epílogo---
+lw $ra, 0($sp)
+lw $s0, 4($sp)
+addi $sp, $sp, 8
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de or---------------------------
+#Registradores
+#$s0 -> rd (registrador onde o resultado vai ser armazenado)
+#$s1 -> rt (registrador operador 1)
+#$s2 -> rs (registrador operador 2)
+#(todos são indices para o vetor de registradores)
+#
+#Argumentos
+#$a0 -> rd
+#$a1 -> rt
+#$a2 -> rs
+executa_or:
+#---Pŕologo---
+addi $sp, $sp, -8
+sw $ra, 0($sp)
+sw $s0, 4($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#-------------
+	la $t0, reg
+	
+	#pegar o endereço de rd e colocar em $t1
+	sll $t1, $s0, 2 #transforma indice de $s0 em offset
+	add $t1, $t1, $t0 #soma o offset no vetor de registradores
+	#$t1 tem o endereço de rd
+	
+	#pegar o endereço de rt e colocar em $t2
+	sll $t2, $s1, 2 #transforma indice de $s1 em offset
+	add $t2, $t2, $t0
+	#$t2 tem o endereço de rt
+	
+	#pegar o endereço de rs e colocar em $t3
+	sll $t3, $s2, 2 #transforma o indice de $s2 em offset
+	add $t3, $t3, $t0 
+	#$t3 tem o endereço de rs
+	
+	#captura os valores dos endereços e realiza a operação
+	lw $t2, 0($t2)
+	lw $t3, 0($t3)
+	or $t4, $t3, $t2
+	
+	#guarda o resultado em rd
+	sw $t4, 0($t1)
+	
+#---Epílogo---
+lw $ra, 0($sp)
+lw $s0, 4($sp)
+addi $sp, $sp, 8
+jr $ra
+#-------------
+#------------------------Fim do Procedimento-----------------------------
+
+#-----------------Procedimento de Execução de and---------------------------
+#Registradores
+#$s0 -> rd (registrador onde o resultado vai ser armazenado)
+#$s1 -> rt (registrador operador 1)
+#$s2 -> rs (registrador operador 2)
+#(todos são indices para o vetor de registradores)
+#
+#Argumentos
+#$a0 -> rd
+#$a1 -> rt
+#$a2 -> rs
+executa_and:
+#---Pŕologo---
+addi $sp, $sp, -8
+sw $ra, 0($sp)
+sw $s0, 4($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#-------------
+	la $t0, reg
+	
+	#pegar o endereço de rd e colocar em $t1
+	sll $t1, $s0, 2 #transforma indice de $s0 em offset
+	add $t1, $t1, $t0 #soma o offset no vetor de registradores
+	#$t1 tem o endereço de rd
+	
+	#pegar o endereço de rt e colocar em $t2
+	sll $t2, $s1, 2 #transforma indice de $s1 em offset
+	add $t2, $t2, $t0
+	#$t2 tem o endereço de rt
+	
+	#pegar o endereço de rs e colocar em $t3
+	sll $t3, $s2, 2 #transforma o indice de $s2 em offset
+	add $t3, $t3, $t0 
+	#$t3 tem o endereço de rs
+	
+	#captura os valores dos endereços e realiza a operação
+	lw $t2, 0($t2)
+	lw $t3, 0($t3)
+	and $t4, $t3, $t2
+	
+	#guarda o resultado em rd
+	sw $t4, 0($t1)
+	
+#---Epílogo---
+lw $ra, 0($sp)
+lw $s0, 4($sp)
+addi $sp, $sp, 8
+jr $ra
+#-------------
+#------------------------Fim do Procedimento-----------------------------
+
+#-----------------Procedimento de Execução de sub---------------------------
+#Registradores
+#$s0 -> rd (registrador onde o resultado vai ser armazenado)
+#$s1 -> rt (registrador operador 1)
+#$s2 -> rs (registrador operador 2)
+#(todos são indices para o vetor de registradores)
+#
+#Argumentos
+#$a0 -> rd
+#$a1 -> rt
+#$a2 -> rs
+executa_sub:
+#---Pŕologo---
+addi $sp, $sp, -8
+sw $ra, 0($sp)
+sw $s0, 4($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#-------------
+	la $t0, reg
+	
+	#pegar o endereço de rd e colocar em $t1
+	sll $t1, $s0, 2 #transforma indice de $s0 em offset
+	add $t1, $t1, $t0 #soma o offset no vetor de registradores
+	#$t1 tem o endereço de rd
+	
+	#pegar o endereço de rt e colocar em $t2
+	sll $t2, $s1, 2 #transforma indice de $s1 em offset
+	add $t2, $t2, $t0
+	#$t2 tem o endereço de rt
+	
+	#pegar o endereço de rs e colocar em $t3
+	sll $t3, $s2, 2 #transforma o indice de $s2 em offset
+	add $t3, $t3, $t0 
+	#$t3 tem o endereço de rs
+	
+	#captura os valores dos endereços e realiza a operação
+	lw $t2, 0($t2)
+	lw $t3, 0($t3)
+	sub $t4, $t3, $t2
+	
+	#guarda o resultado em rd
+	sw $t4, 0($t1)
+	
+#---Epílogo---
+lw $ra, 0($sp)
+lw $s0, 4($sp)
+addi $sp, $sp, 8
+jr $ra
+#-------------
+#------------------------Fim do Procedimento-----------------------------
+
 #-----------------Procedimento de Execução de add---------------------------
 #Registradores
 #$s0 -> rd (registrador onde o resultado vai ser armazenado)
@@ -262,12 +496,37 @@ move $s1, $a1
 move $s2, $a2
 #-------------
 	la $t0, reg
-
+	
+	#pegar o endereço de rd e colocar em $t1
+	sll $t1, $s0, 2 #transforma indice de $s0 em offset
+	add $t1, $t1, $t0 #soma o offset no vetor de registradores
+	#$t1 tem o endereço de rd
+	
+	#pegar o endereço de rt e colocar em $t2
+	sll $t2, $s1, 2 #transforma indice de $s1 em offset
+	add $t2, $t2, $t0
+	#$t2 tem o endereço de rt
+	
+	#pegar o endereço de rs e colocar em $t3
+	sll $t3, $s2, 2 #transforma o indice de $s2 em offset
+	add $t3, $t3, $t0 
+	#$t3 tem o endereço de rs
+	
+	#captura os valores dos endereços e realiza a operação
+	lw $t2, 0($t2)
+	lw $t3, 0($t3)
+	add $t4, $t3, $t2
+	
+	#guarda o resultado em rd
+	sw $t4, 0($t1)
+	
 #---Epílogo---
 lw $ra, 0($sp)
 lw $s0, 4($sp)
+addi $sp, $sp, 8
+jr $ra
 #-------------
-#---------------------------------------------------------------------------
+#------------------------Fim do Procedimento-----------------------------
 
 #-----------------Procedimento de Execução de sll---------------------------
 #Registradores
@@ -321,8 +580,8 @@ lw $s0, 4($sp)
 addi $sp, $sp, 8
 jr $ra
 #-------------
+#------------------------Fim do Procedimento-----------------------------
 
-#--------------------------------------------------------------------
 #-----------------Procedimento de Execução de srl---------------------------
 #Registradores
 #$s0 -> shamt
@@ -375,9 +634,7 @@ lw $s0, 4($sp)
 addi $sp, $sp, 8
 jr $ra
 #-------------
-#--------------------------------------------------------------------
-#####################################################
-################Tipos de Instrucao######################
+#------------------------Fim do Procedimento-----------------------------
 
 
 finaliza:
