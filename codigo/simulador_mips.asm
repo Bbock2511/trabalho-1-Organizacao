@@ -80,29 +80,33 @@ inicializaReg:
 #$a1 <- endereço de IR
 #$a2 <- endereço de mem_text
 #Registradores
-#$s0 -> palavra de PC
-#$s1 -> endereço de PC
+#$s0 <- endereço de PC
+#$s1 -> endereço de IR
+#$s2 <- endereço de mem_text
+#$s3 -> palavra de PC
 busca:
 #---Prólogo---
 addi $sp, $sp, -4
 sw $ra, 0($sp)
 
-move $s1, $a0
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
 #-------------
-	lw $s0, 0($s1) #pega a palavra em PC
+	lw $s3, 0($s1) #pega a palavra em PC
 	li $t1, 0x00400000
-	sub $t0, $s0, $t1 #subtrai o endereço base do endereço da próxima instrução para encontrar o offset necessário para pegar a instrução de mem_text
-	add $t0, $t0, $a2 #soma o offset 
+	sub $t0, $s3, $t1 #subtrai o endereço base do endereço da próxima instrução para encontrar o offset necessário para pegar a instrução de mem_text
+	add $t0, $t0, $s2 #soma o offset 
 	
 	lw $t1, 0($t0) #tira a instrução do endereço correspondente de mem_text
-	sw $t1, 0($a1) #coloca a instrução em IR(instrução a ser executada)
+	sw $t1, 0($s1) #coloca a instrução em IR(instrução a ser executada)
 	
 	#decode(IR)
-	move $a0, $a1 #coloca o endereço de IR em a0
+	move $a0, $s1 #coloca o endereço de IR em a0
 	jal decode
 	
 	#passa para o próximo endereço
-	addi $s0, $s0, 4 
+	addi $s3, $s3, 4 
 	sw $s0, 0($s1) 
 	
 #---Epílogo---
@@ -120,10 +124,12 @@ jr $ra
 #$a0 <- endereço de IR
 decode:
 #---Prólogo---
-addi $sp, $sp, -12
+addi $sp, $sp, -20
 sw $ra, 0($sp) #guarda endereço de retorno
-sw $s0, 4($sp) #armazena $s0 da função anterior(palavra de PC)
-sw $s1, 8($sp) #armazena $s1 da função anterior(endereço de PC)
+sw $s0, 4($sp) #armazena $s0 da função anterior
+sw $s1, 8($sp) #armazena $s1 da função anterior
+sw $s2, 12($sp)
+sw $s3, 16($sp)
 
 move $t0, $a0 
 #-------------
@@ -167,21 +173,122 @@ move $t0, $a0
 		#bne
 		#syscall
 	opcodeI:
+		#I_decode(conteudo_IR)
+		move $a0, $t0
+		jal I_decode
+		j terminaDecodificacao
 		
 terminaDecodificacao:
 #---Epílogo---
 lw $ra, 0($sp)
 lw $s0, 4($sp)
 lw $s1, 8($sp)
-addi $sp, $sp, 12
+lw $s2, 12($sp)
+lw $s3, 16($sp)
+addi $sp, $sp, 20
 
 jr $ra
 #-------------
 #------------------------Fim do Procedimento-----------------------------
 
+#------------Procedimendo de Decodificação tipo I-----------------
+#Registradores:
+#$s0 -> Instrução a ser decodificada
+#
+#Argumentos: 
+#$a0 -> Instrução que está em IR
+I_decode:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+#-------------
+	sll $t1, $s0, 26 #extrai o opcode deslocando todos os bits para a esquerda excetos os do opcode
+	
+	andi $a0, $s0, 0x1ffff #utiliza o número 0x1ffff para zerar os bits exceto aqueles do valor imediato e insere como primeiro argumento do procedimento a ser chamado
+	
+	andi $a1, $s0, 0x03e00000 #utiliza o número 0x03e00000 para zerar os bits exceto aqueles do valor imediato e insere como segundo argumento do procedimento a ser chamado
+	
+	andi $a2, $s0, 0x07c00000 #utiliza o número 0x07c00000 para zerar os bits exceto aqueles do valor imediato e insere como terceiro argumento do procedimento a ser chamado
+	
+	#verifica qual a instrução pelo opcode e salta para sua execução
+	li $t2, 0x04
+	beq $t1, $t2, I_beq
+	
+	li $t2, 0x05
+	beq $t1, $t2, I_bne
+		
+	li $t2, 0x09
+	beq $t1, $t2, I_addiu
+		
+	li $t2, 0x0d
+	beq $t1, $t2,I_ori
+		
+	li $t2, 0x0f
+	beq $t1, $t2, I_lui
+		
+	li $t2, 0x23
+	beq $t1, $t2, I_lw
+		
+	li $t2, 0x2b
+	beq $t1, $t2, I_sw
+		
+	li $t2, 0x28
+	beq $t1, $t2, I_sb
+		
+	li $t2, 0x24
+	beq $t1, $t2, I_lbu
+		
+	I_beq:
+		#executa_beq(Immediate, rt, rs)
+		jal executa_beq
+		j terminaDecodeI
+	I_bne:
+		#executa_bne(Immediate, rt, rs)
+		jal executa_bne
+		j terminaDecodeI
+	I_addiu:
+		#executa_addiu(Immediate, rt, rs)
+		jal executa_addiu
+		j terminaDecodeI
+	I_ori:
+		#executa_ori(Immediate, rt, rs)
+		jal executa_ori
+		j terminaDecodeI
+	I_lui:
+		#executa_lui(Immediate, rt, rs)
+		jal executa_lui
+		j terminaDecodeI
+	I_lw:
+		#executa_lw(Immediate, rt, rs)
+		jal executa_lw
+		j terminaDecodeI
+	I_sw:
+		#executa_sw(Immediate, rt, rs)
+		jal executa_sw
+		j terminaDecodeI
+	I_sb:
+		#executa_sb(Immediate, rt, rs)
+		jal executa_sb
+		j terminaDecodeI
+	I_lbu:
+		jal executa_lbu
+		j terminaDecodeI
+
+terminaDecodeI:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
 #------------Procedimendo de Decodificação tipo R-----------------
 #Registradores:
 #$s0 -> Instrução a ser decodificada
+#
+#Argumentos: 
+#$a0 -> Instrução que está em IR
 R_decode:
 #---Prólogo---
 addi $sp, $sp, -4
@@ -279,6 +386,452 @@ move $s0, $a0
 		j terminaDecodeR
 	
 terminaDecodeR:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de lbu-------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#$s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_lbu:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#------------
+	la $t0, reg
+	la $t1, mem_data
+	
+	#pegando o conteudo do registrador rs
+	sll $t2, $s2, 2
+	add $t2, $t2, $t0
+	lw $t2, 0($t2)
+	
+	#pegando o endereço do registrador rt
+	sll $t3, $s1, 2
+	add $t3, $t3, $t0
+	
+	#soma o offset(valor imediato) ao endereço contido no registrador rs
+	add $t2, $t2, $s0
+	
+	#subtrai o endereço base de mem_data do endereço adquirido do registrador rs a fim de descobrir o deslocamento para alcançar o endereço correto em mem_data
+	li $t4, 0x10010000
+	sub $t2, $t2, $t4
+	
+	#adiciona o offset
+	add $t2, $t2, $t1
+	lbu $t4, 0($t2) 
+	
+	#coloca o conteudo no registrador rt(destino)
+	sb $t4, 0($t3)
+
+terminaExecucaoLbu:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+
+#-----------------Procedimento de Execução de sb-------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#$s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_sb:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#------------
+	la $t0, reg
+	la $t1, mem_data
+	
+	#pegando o conteudo do registrador rs
+	sll $t2, $s2, 2
+	add $t2, $t2, $t0
+	lw $t2, 0($t2)
+	
+	#pegando o endereço do registrador rt
+	sll $t3, $s1, 2
+	add $t3, $t3, $t0
+	
+	#soma o offset(valor imediato) ao endereço contido no registrador rs
+	add $t2, $t2, $s0
+	
+	#subtrai o endereço base de mem_data do endereço adquirido do registrador rs a fim de descobrir o deslocamento para alcançar o endereço correto em mem_data
+	li $t4, 0x10010000
+	sub $t2, $t2, $t4
+	
+	#adiciona o offset para percorrer mem_data
+	add $t2, $t2, $t1
+	
+	#pega o conteúdo de rt
+	lb $t3, 0($t3)
+	sb $t3, 0($t2)
+
+terminaExecucaoSb:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de sw-------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#$s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_sw:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#------------
+	la $t0, reg
+	la $t1, mem_data
+	
+	#pegando o conteudo do registrador rs
+	sll $t2, $s2, 2
+	add $t2, $t2, $t0
+	lw $t2, 0($t2)
+	
+	#pegando o endereço do registrador rt
+	sll $t3, $s1, 2
+	add $t3, $t3, $t0
+	
+	#soma o offset(valor imediato) ao endereço contido no registrador rs
+	add $t2, $t2, $s0
+	
+	#subtrai o endereço base de mem_data do endereço adquirido do registrador rs a fim de descobrir o deslocamento para alcançar o endereço correto em mem_data
+	li $t4, 0x10010000
+	sub $t2, $t2, $t4
+	
+	#adiciona o offset para percorrer mem_data
+	add $t2, $t2, $t1
+	
+	#pega o conteúdo de rt
+	lw $t3, 0($t3)
+	sw $t3, 0($t2)
+
+terminaExecucaoSw:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de lw-------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#$s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_lw:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#------------
+	la $t0, reg
+	la $t1, mem_data
+	
+	#pegando o conteudo do registrador rs
+	sll $t2, $s2, 2
+	add $t2, $t2, $t0
+	lw $t2, 0($t2)
+	
+	#pegando o endereço do registrador rt
+	sll $t3, $s1, 2
+	add $t3, $t3, $t0
+	
+	#soma o offset(valor imediato) ao endereço contido no registrador rs
+	add $t2, $t2, $s0
+	
+	#subtrai o endereço base de mem_data do endereço adquirido do registrador rs a fim de descobrir o deslocamento para alcançar o endereço correto em mem_data
+	li $t4, 0x10010000
+	sub $t2, $t2, $t4
+	
+	#adiciona o offset
+	add $t2, $t2, $t1
+	lw $t4, 0($t2) 
+	
+	#coloca o conteudo no registrador rt(destino)
+	sw $t4, 0($t3)
+
+terminaExecucaoLw:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de lui-------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#$s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_lui:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#------------
+	la $t0, reg
+	
+	#pegando o endereço de rt
+	sll $t1, $s1, 2
+	add $t1, $t1, $t0
+	
+	sll $s0, $s0, 16 #desloca o imediato para os bits mais significativos do registrador
+	
+	sw $s0, 0($t1) #armazena o valor da instrução no registrador ordenado
+
+terminaExecucaoLui:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de ori-------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#$s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_ori:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#------------
+	la $t0, reg
+	
+	#pegando o endereço de rs
+	sll $t1, $s2, 2
+	add $t1, $t1, $t0
+	sw $t1, 0($t1) #colocando o conteúdo de reg[rs] em $t1
+	
+	or $t2, $t1, $s0 #realiza a operação
+	
+	#pegando o endereço de rt
+	sll $t1, $s1, 2
+	add $t1, $t1, $t0
+	
+	sw $t2, 0($t1) #coloca o resultado da operação or em reg[rt]($t1)
+
+terminaExecucaoOri:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de addiu--------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#$s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_addiu:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#------------
+	la $t0, reg
+
+	# Extensão de sinal do imediato (16 bits para 32 bits)
+	andi $t1, $s0, 0x8000           # Pega o bit mais significativo (bit 15) do imediato
+	beq $t1, $zero, imediato_positivo_addiu # Se o bit 15 é 0, o imediato é positivo
+
+	ori $s0, $s0, 0xffff0000        # Se o bit 15 é 1, estende o sinal preenchendo os bits superiores com 1s
+
+imediato_positivo_addiu:	# Label renomeado para maior clareza
+	
+	# Carrega o VALOR de rs em $t2
+	sll $t1, $s2, 2 #Trasforma  o índice de $s2 em offset
+	add $t1, $t1, $t0 #Soma o offset ao endereço base do vetor de registradores
+	lw $t2, 0($t1) #Pega o valor de rs e coloca em $t2
+	
+	addu $t3, $t2, $s0 # $t3 = rs + (imediato_estendido_por_sinal)
+	
+	# Salva o valor no registrador rt
+	
+	#$t2 <- endereço de reg[rt]
+	sll $t1, $s1, 2 #Transforma o indice de $s1 em offset
+	add $t2, $t1, $t0 #Soma o offset ao endereço base do vetor de registradores
+	
+	sw $t3, 0($t2)
+
+terminaExecucaoAddiu:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de bne---------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#$s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_bne:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#-------------
+	la $t2, PC #pega o endereço de PC para alterá-lo futuramente
+	la $s3, reg
+	
+	#pegando o valor de rt
+	sll $t0, $s1, 2 #transforma o indice em offset
+	add $t0, $t0, $s3 # soma o offset ao endereço original
+	lw $t0, 0($t0) #coloca o conteúdo do registrador em $t0
+
+	#pegando o valor de rs
+	sll $t1, $s2, 2 #transforma o indice em offset
+	add $t1, $t1, $s3 # soma o offset ao endereço original
+	lw $t1, 0($t1) #coloca o conteúdo do registrador em $t1
+	
+	beq $t0, $t1, terminaExecucaoBne #caso sejam iguais, não realiza o desvio e finaliza o procedimento
+	
+	addi $s0, $s0, -4 #subtrai 4 para que o incremento do loop de busca não salte para a próxima
+	sw $s0, 0($t2) #muda o valor da próxima instrução para a que será desviada
+	
+terminaExecucaoBne:
+#---Epílogo---
+lw $ra, 0($sp)
+addi $sp, $sp, 4
+jr $ra
+#-------------
+#------------------------Fim do Procedimento------------------------------
+
+#-----------------Procedimento de Execução de beq---------------------------
+#Registradores:
+#$s0 -> Valor imediato da operação
+#$s1 -> Indice de rt(registrador destino)
+#$s2 -> Indice de rs(registrador operador)
+#s3 -> Endereço do vetor de registradores simulados
+#
+#Argumentos:
+#$a0 -> Valor imediato da operação
+#$a1 -> Indice de rt(registrador destino ou segundo operador)
+#$a2 -> Indice de rs(registrador operador)
+executa_beq:
+#---Prólogo---
+addi $sp, $sp, -4
+sw $ra, 0($sp)
+
+move $s0, $a0
+move $s1, $a1
+move $s2, $a2
+#-------------	
+	la $t2, PC #pega o endereço de PC para alterá-lo futuramente
+	la $s3, reg
+	
+	#pegando o valor de rt
+	sll $t0, $s1, 2 #transforma o indice em offset
+	add $t0, $t0, $s3 # soma o offset ao endereço original
+	lw $t0, 0($t0) #coloca o conteúdo do registrador em $t0
+
+	#pegando o valor de rs
+	sll $t1, $s2, 2 #transforma o indice em offset
+	add $t1, $t1, $s3 # soma o offset ao endereço original
+	lw $t1, 0($t1) #coloca o conteúdo do registrador em $t1
+	
+	beq $t0, $t1, realiza_desvio_beq
+	
+	j terminaExecucaoBeq
+
+realiza_desvio_beq:
+	addi $s0, $s0, -4 #subtrai 4 para que o incremento do loop de busca não salte para a próxima
+	sw $s0, 0($t2) #muda o valor da próxima instrução para a que será desviada
+    
+terminaExecucaoBeq:
 #---Epílogo---
 lw $ra, 0($sp)
 addi $sp, $sp, 4

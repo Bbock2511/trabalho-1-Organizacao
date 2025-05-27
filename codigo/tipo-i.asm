@@ -1,6 +1,6 @@
 opBeq:
-    la $t1, pcSimulado
-    lw $t0, 0($a0) 
+    la $t1, PC
+    lw $t0, 0($a0)
     # Não é necessário carregar $a1 se for $zero, mas para uma implementação genérica de beq:
     lw $t3, 0($a1)
 
@@ -15,7 +15,7 @@ realiza_desvio_beq:
     sw $t2, 0($t1)
 
     jr $ra
-    
+ 
 opAddiu:
     # Extensão de sinal do imediato (16 bits para 32 bits)
     andi $t0, $a2, 0x8000           # Pega o bit mais significativo (bit 15) do imediato
@@ -43,7 +43,7 @@ opOri:
 	sw $t1, 0($a1)   # Salva o valor em $t1 no registrador rt (endereço em $a1)
 	
 	jr $ra
-	
+
 opLui:
 	sll $t1, $a2, 16       							#move os 16 bits menos significativos para a esquerda
    	sw $t1, 0($a1)           						#salva o valor no registrador rt
@@ -91,7 +91,7 @@ continua_lbu:
 
     lbu $t1, 0($t0)           # Carrega byte unsigned da memória no endereço $t0
     sw $t1, 0($a1)            # Armazena byte carregado no registrador de destino ($a1 é o endereço do registrador rt)
-    jr $ra
+    jr $ra	    
     
 opSb:
     bne $a3, 1, n_reg_pilha_sb
