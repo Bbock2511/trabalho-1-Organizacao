@@ -3,6 +3,8 @@ ErroInstrucaoR: .asciiz "Falha em ler funct tipo R"
 #Nome dos arquivos
 nomeArquivoBin: .asciiz "ex-000-073.bin"
 nomeArquivoDat: .asciiz "ex-000-073.dat"
+#nomeArquivoBin: .asciiz "teste.bin"
+#nomeArquivoDat: .asciiz "teste.dat"
 bytes_lidosBin: .word 0
 bytes_lidosDat: .word 0
 #Variaveis de leitura de instrução
@@ -183,6 +185,7 @@ move $s2, $a2
 	#decode(IR)
 	move $a0, $s1 #coloca o endereço de IR em a0
 	jal decode
+	lw $s3, 0($s0) #pega o possivelmente novo endereço após a execução de decode
 	
 	#passa para o próximo endereço
 	addi $s3, $s3, 4 
@@ -208,7 +211,6 @@ sw $ra, 0($sp) #guarda endereço de retorno
 sw $s0, 4($sp) #armazena $s0 da função anterior
 sw $s1, 8($sp) #armazena $s1 da função anterior
 sw $s2, 12($sp)
-sw $s3, 16($sp)
 
 move $t0, $a0 
 #-------------
@@ -241,6 +243,8 @@ move $t0, $a0
 	#decodifica tipo J
 	opcodeJ:
 		andi $t0, $t0, 0x03ffffff #usa o número hexadecimal para zerar os bits do opcode e manter o endereço
+		# $t0 já contém o campo target (26 bits)
+		sll $t0, $t0, 2 #transforma os 26 bits em 28(endereço válido)
 		
 		#salta para a execução de j
 		li $t2, 0x02 
@@ -274,7 +278,6 @@ lw $ra, 0($sp)
 lw $s0, 4($sp)
 lw $s1, 8($sp)
 lw $s2, 12($sp)
-lw $s3, 16($sp)
 addi $sp, $sp, 20
 
 jr $ra
@@ -886,8 +889,10 @@ move $s2, $a2
 	
 	beq $t0, $t1, terminaExecucaoBne #caso sejam iguais, não realiza o desvio e finaliza o procedimento
 	
-	addi $s0, $s0, -4 #subtrai 4 para que o incremento do loop de busca não salte para a próxima
-	sw $s0, 0($t2) #muda o valor da próxima instrução para a que será desviada
+	sll $s0, $s0, 2 #desloca o imediato em 2 bits
+	lw $t0, 0($t2) #pega a palavra de pc
+	add $t0, $t0, $s0 #soma o offset do brach com o pc atual
+	sw $t0, 0($t2) #armazena em pc o endereço desviado
 	
 terminaExecucaoBne:
 #---Epílogo---
@@ -935,8 +940,10 @@ move $s2, $a2
 	j terminaExecucaoBeq
 
 realiza_desvio_beq:
-	addi $s0, $s0, -4 #subtrai 4 para que o incremento do loop de busca não salte para a próxima
-	sw $s0, 0($t2) #muda o valor da próxima instrução para a que será desviada
+	sll $s0, $s0, 2 #desloca o imediato em 2 bits
+	lw $t0, 0($t2) #pega a palavra de pc
+	add $t0, $t0, $s0 #soma o offset do brach com o pc atual
+	sw $t0, 0($t2) #armazena em pc o endereço desviado
     
 terminaExecucaoBeq:
 #---Epílogo---
@@ -963,7 +970,7 @@ move $s0, $a0
 	#Pega o endereço de PC
 	la $t0, PC
 	
-	addi $s0, $s0, -4 #subtrai 4 do endereço para que o incremento de busca não altere o endereço
+	addi $s0, $s0, -4
 	sw $s0, 0($t0)
 #---Epílogo---
 lw $ra, 0($sp)
@@ -996,7 +1003,7 @@ move $s0, $a0
 	addi $t2, $t2, 4
 	
 	#colocando o endereço de link no registrador $ra
-	lw $t2, 124($t1)
+	sw $t2, 124($t1)
 	
 	#dá o salto
 	addi $s0, $s0, -4 #subtrai 4 do endereço para que o incremento de busca não altere o endereço
@@ -1021,12 +1028,22 @@ sw $ra, 0($sp)
 	la $t0, reg
 	lw $t1, 8($t0) #pega o conteúdo de $v0
 	
+	li $t2, 1
+	beq $t1, $t2, pInt
 	li $t2, 4
 	beq $t1, $t2, pStr
 	li $t2, 11
 	beq $t1, $t2, pChar
 	li $t2, 17
 	beq $t1, $t2, exit2
+	
+	pInt:
+		lw $t1, 16($t0) #pega o numero a se imprimido de $a0
+		lw $v0, 8($t0) #coloca o valor de print int em $v0 
+		move $a0, $t1
+		syscall
+		
+		j terminaExecucaoSyscall
 	
 	pStr:
 		lw $t1, 16($t0) #pega o endereço da string de $a0
