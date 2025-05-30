@@ -3,10 +3,6 @@ ErroInstrucaoR: .asciiz "Falha em ler funct tipo R"
 #Nome dos arquivos
 nomeArquivoBin: .asciiz "ex-000-073.bin"
 nomeArquivoDat: .asciiz "ex-000-073.dat"
-#nomeArquivoBin: .asciiz "teste.bin"
-#nomeArquivoDat: .asciiz "teste.dat"
-bytes_lidosBin: .word 0
-bytes_lidosDat: .word 0
 #Variaveis de leitura de instrução
 PC: .word 0x00400000 #variável que capturará as instruções lidas
 IR: .word 0 #endereço será sobrescrito pela instrução capturada por PC
@@ -107,7 +103,6 @@ leArquivoDat:
 	la $a1, mem_data # onde salvar
 	li $a2, 5120 # quantos bytes ler
 	syscall
-	sw $v0, bytes_lidosDat # salva o tamanho lido
 	
 	 #Fecha o arquivo
 	li $v0, 16
@@ -141,8 +136,6 @@ leArquivoBin:
 	syscall
 	
 	beqz $v0, finaliza
-	
-	sw $v0, bytes_lidosBin # salva o tamanho lido
 	
 	 #Fecha o arquivo
 	li $v0, 16
@@ -1542,7 +1535,7 @@ jr $ra
 #-------------
 #------------------------Fim do Procedimento-----------------------------
 
-
+#é usado em caso de erro na leitura de funct
 finaliza:
 ###fim do programa###
 	li $v0, 10
