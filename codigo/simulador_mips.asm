@@ -1,3 +1,9 @@
+# Projeto: Simulador MIPS
+# Arquivo: simulador_mips.asm
+# Descricao: Trabalho 1 da disciplina de Organização de Computadores
+# Autores: Bruno H. Bock e João Pedro Quadros
+# Data: 29/05/2025
+
 .data
 ErroInstrucaoR: .asciiz "Falha em ler funct tipo R"
 #Nome dos arquivos
@@ -10,7 +16,7 @@ IR: .word 0 #endereço será sobrescrito pela instrução capturada por PC
 #Memória simulada do processador
 reg:.space 128 #registradores do mips
 mem_text:.space 2048
-mem_data:.space 5120 
+mem_data:.space 4096 
 mem_stack:.space 1024 #Memória para a pilha $sp
 #############################################
 
@@ -101,7 +107,7 @@ leArquivoDat:
 	li $v0, 14 # syscall: read
 	move $a0, $t0 # file descriptor
 	la $a1, mem_data # onde salvar
-	li $a2, 5120 # quantos bytes ler
+	li $a2, 4096 # quantos bytes ler
 	syscall
 	
 	 #Fecha o arquivo
@@ -132,7 +138,7 @@ leArquivoBin:
 	li $v0, 14 # syscall: read
 	move $a0, $t0 # file descriptor
 	la $a1, mem_text # onde salvar
-	li $a2, 5120 # quantos bytes ler
+	li $a2, 2048 # quantos bytes ler
 	syscall
 	
 	beqz $v0, finaliza
@@ -1416,7 +1422,7 @@ move $s0, $a0
 	add $t2, $t2, $t0 #soma offset
 	lw $t2, 0($t2) #pega o endereço
 	
-	addi $t2, $t2, -4 #reduz o endereço em 4 para que o incremento não pule para o endereço seguinte
+	addi $t2, $t2, -4 #reduz o endereço em 4 para que o incremento não pule para o endereço seguinteI
 	sw $t2, 0($t1)
 
 #---Epílogo---
