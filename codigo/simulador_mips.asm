@@ -547,7 +547,7 @@ move $s2, $a2
 	lbu $t4, 0($t2) 
 	
 	#coloca o conteudo no registrador rt(destino)
-	sb $t4, 0($t3)
+	sw $t4, 0($t3)
 
 terminaExecucaoLbu:
 #---Epílogo---
