@@ -1,10 +1,14 @@
+# Projeto: Simulador MIPS
+# Arquivo: simulador_mips.asm
+# Descricao: Trabalho 1 da disciplina de Organização de Computadores
+# Autores: Bruno H. Bock e João Pedro Quadros
+# Data: 29/05/2025
+
 .data
 ErroInstrucaoR: .asciiz "Falha em ler funct tipo R"
 #Nome dos arquivos
 nomeArquivoBin: .asciiz "ex-000-073.bin"
 nomeArquivoDat: .asciiz "ex-000-073.dat"
-#nomeArquivoBin: .asciiz "teste.bin"
-#nomeArquivoDat: .asciiz "teste.dat"
 bytes_lidosBin: .word 0
 bytes_lidosDat: .word 0
 #Variaveis de leitura de instrução
@@ -14,7 +18,7 @@ IR: .word 0 #endereço será sobrescrito pela instrução capturada por PC
 #Memória simulada do processador
 reg:.space 128 #registradores do mips
 mem_text:.space 2048
-mem_data:.space 5120 
+mem_data:.space 4096 
 mem_stack:.space 1024 #Memória para a pilha $sp
 #############################################
 
@@ -105,7 +109,7 @@ leArquivoDat:
 	li $v0, 14 # syscall: read
 	move $a0, $t0 # file descriptor
 	la $a1, mem_data # onde salvar
-	li $a2, 5120 # quantos bytes ler
+	li $a2, 4096 # quantos bytes ler
 	syscall
 	sw $v0, bytes_lidosDat # salva o tamanho lido
 	
@@ -137,7 +141,7 @@ leArquivoBin:
 	li $v0, 14 # syscall: read
 	move $a0, $t0 # file descriptor
 	la $a1, mem_text # onde salvar
-	li $a2, 5120 # quantos bytes ler
+	li $a2, 2048 # quantos bytes ler
 	syscall
 	
 	beqz $v0, finaliza
